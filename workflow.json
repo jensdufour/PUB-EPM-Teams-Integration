@@ -1,0 +1,797 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "contentVersion": "1.0.0.0",
+        "triggers": {
+            "Recurrence": {
+                "recurrence": {
+                    "frequency": "Minute",
+                    "interval": 5
+                },
+                "evaluatedRecurrence": {
+                    "frequency": "Minute",
+                    "interval": 5
+                },
+                "type": "Recurrence"
+            }
+        },
+        "actions": {
+            "Get_Elevation_Requests": {
+                "runAfter": {},
+                "type": "Http",
+                "inputs": {
+                    "uri": "@{parameters('graphApiBaseUrl')}/deviceManagement/elevationRequests",
+                    "method": "GET",
+                    "authentication": {
+                        "type": "ManagedServiceIdentity",
+                        "audience": "@parameters('graphApiAudience')",
+                        "identity": "@parameters('managedIdentityResourceId')"
+                    }
+                },
+                "runtimeConfiguration": {
+                    "contentTransfer": {
+                        "transferMode": "Chunked"
+                    }
+                }
+            },
+            "Parse_Elevation_Requests": {
+                "runAfter": {
+                    "Get_Elevation_Requests": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "ParseJson",
+                "inputs": {
+                    "content": "@body('Get_Elevation_Requests')",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "@@odata.context": {
+                                "type": "string"
+                            },
+                            "value": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string"
+                                        },
+                                        "requestedByUserId": {
+                                            "type": "string"
+                                        },
+                                        "requestedOnDeviceId": {
+                                            "type": "string"
+                                        },
+                                        "requestedByUserPrincipalName": {
+                                            "type": "string"
+                                        },
+                                        "deviceName": {},
+                                        "requestCreatedDateTime": {
+                                            "type": "string"
+                                        },
+                                        "requestLastModifiedDateTime": {
+                                            "type": "string"
+                                        },
+                                        "requestJustification": {
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        },
+                                        "reviewCompletedByUserId": {
+                                            "type": "string"
+                                        },
+                                        "reviewCompletedByUserPrincipalName": {},
+                                        "reviewCompletedDateTime": {},
+                                        "requestExpiryDateTime": {
+                                            "type": "string"
+                                        },
+                                        "reviewerJustification": {},
+                                        "applicationDetail": {
+                                            "type": "object",
+                                            "properties": {
+                                                "fileHash": {
+                                                    "type": "string"
+                                                },
+                                                "fileName": {
+                                                    "type": "string"
+                                                },
+                                                "filePath": {
+                                                    "type": "string"
+                                                },
+                                                "fileDescription": {
+                                                    "type": "string"
+                                                },
+                                                "publisherName": {
+                                                    "type": "string"
+                                                },
+                                                "publisherCert": {
+                                                    "type": "string"
+                                                },
+                                                "productName": {
+                                                    "type": "string"
+                                                },
+                                                "productInternalName": {
+                                                    "type": "string"
+                                                },
+                                                "productVersion": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "requestedByUserId",
+                                        "requestedOnDeviceId",
+                                        "requestedByUserPrincipalName",
+                                        "deviceName",
+                                        "requestCreatedDateTime",
+                                        "requestLastModifiedDateTime",
+                                        "requestJustification",
+                                        "status",
+                                        "reviewCompletedByUserId",
+                                        "reviewCompletedByUserPrincipalName",
+                                        "reviewCompletedDateTime",
+                                        "requestExpiryDateTime",
+                                        "reviewerJustification",
+                                        "applicationDetail"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Filter_Pending_Requests": {
+                "runAfter": {
+                    "Parse_Elevation_Requests": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Query",
+                "inputs": {
+                    "from": "@body('Parse_Elevation_Requests')?['value']",
+                    "where": "@equals(item()?['status'], 'pending')"
+                }
+            },
+            "For_Each_Pending_Request": {
+                "foreach": "@body('Filter_Pending_Requests')",
+                "actions": {
+                    "Set_Adaptive_Card_Variable": {
+                        "type": "SetVariable",
+                        "inputs": {
+                            "name": "AdaptiveCard",
+                            "value": {
+                                "type": "AdaptiveCard",
+                                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                                "version": "1.4",
+                                "body": [
+                                    {
+                                        "type": "Container",
+                                        "style": "emphasis",
+                                        "items": [
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "Endpoint Privilege Management - Approval Request",
+                                                "weight": "Bolder",
+                                                "size": "Large",
+                                                "color": "Accent"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "FactSet",
+                                        "facts": [
+                                            {
+                                                "title": "Request ID:",
+                                                "value": "@{items('For_Each_Pending_Request')?['id']}"
+                                            },
+                                            {
+                                                "title": "Requester:",
+                                                "value": "@{items('For_Each_Pending_Request')?['requestedByUserPrincipalName']}"
+                                            },
+                                            {
+                                                "title": "Device Name:",
+                                                "value": "@{items('For_Each_Pending_Request')?['requestedOnDeviceName']}"
+                                            },
+                                            {
+                                                "title": "Application:",
+                                                "value": "@{items('For_Each_Pending_Request')?['applicationDetail']?['fileName']}"
+                                            },
+                                            {
+                                                "title": "File Path:",
+                                                "value": "@{items('For_Each_Pending_Request')?['applicationDetail']?['filePath']}"
+                                            },
+                                            {
+                                                "title": "Product:",
+                                                "value": "@{items('For_Each_Pending_Request')?['applicationDetail']?['productName']}"
+                                            },
+                                            {
+                                                "title": "Publisher:",
+                                                "value": "@{items('For_Each_Pending_Request')?['applicationDetail']?['publisherName']}"
+                                            },
+                                            {
+                                                "title": "Requested:",
+                                                "value": "@{items('For_Each_Pending_Request')?['requestCreatedDateTime']}"
+                                            },
+                                            {
+                                                "title": "Status:",
+                                                "value": "@{items('For_Each_Pending_Request')?['status']}"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "Container",
+                                        "style": "accent",
+                                        "items": [
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "Justification",
+                                                "weight": "Bolder",
+                                                "size": "Medium"
+                                            },
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "@{items('For_Each_Pending_Request')?['requestJustification']}",
+                                                "wrap": true
+                                            }
+                                        ]
+                                    }
+                                ],
+                                "actions": [
+                                    {
+                                        "type": "Action.Submit",
+                                        "title": "Approve",
+                                        "style": "positive",
+                                        "data": {
+                                            "requestId": "@{items('For_Each_Pending_Request')?['id']}",
+                                            "action": "approve"
+                                        }
+                                    },
+                                    {
+                                        "type": "Action.Submit",
+                                        "title": "Deny",
+                                        "style": "destructive",
+                                        "data": {
+                                            "requestId": "@{items('For_Each_Pending_Request')?['id']}",
+                                            "action": "deny"
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "Post_adaptive_card_and_wait_for_a_response": {
+                        "runAfter": {
+                            "Set_Adaptive_Card_Variable": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnectionWebhook",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['teams']['connectionId']"
+                                }
+                            },
+                            "body": {
+                                "notificationUrl": "@listCallbackUrl()",
+                                "body": {
+                                    "messageBody": "@{variables('AdaptiveCard')}",
+                                    "recipient": {
+                                        "groupId": "@parameters('teamsTeamId')",
+                                        "channelId": "@parameters('teamsChannelId')"
+                                    }
+                                }
+                            },
+                            "path": "/v1.0/teams/conversation/gatherinput/poster/Flow bot/location/@{encodeURIComponent('Channel')}/$subscriptions"
+                        }
+                    },
+                    "Set_MessageId_Variable": {
+                        "runAfter": {
+                            "Post_adaptive_card_and_wait_for_a_response": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "SetVariable",
+                        "inputs": {
+                            "name": "MessageId",
+                            "value": "@body('Post_adaptive_card_and_wait_for_a_response')?['messageId']"
+                        }
+                    },
+                    "Parse_Response_Data": {
+                        "runAfter": {
+                            "Set_MessageId_Variable": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ParseJson",
+                        "inputs": {
+                            "content": "@body('Post_adaptive_card_and_wait_for_a_response')?['data']",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "requestId": {
+                                        "type": "string"
+                                    },
+                                    "action": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "Check_Action_Type": {
+                        "actions": {
+                            "Approve_Elevation_Request": {
+                                "type": "Http",
+                                "inputs": {
+                                    "uri": "@{parameters('graphApiBaseUrl')}/deviceManagement/elevationRequests/@{body('Parse_Response_Data')?['requestId']}/approve",
+                                    "method": "POST",
+                                    "body": {
+                                        "reviewerJustification": "Approved via Teams by @{body('Post_adaptive_card_and_wait_for_a_response')?['responder']?['displayName']}"
+                                    },
+                                    "authentication": {
+                                        "type": "ManagedServiceIdentity",
+                                        "audience": "@parameters('graphApiAudience')",
+                                        "identity": "@parameters('managedIdentityResourceId')"
+                                    }
+                                },
+                                "runtimeConfiguration": {
+                                    "contentTransfer": {
+                                        "transferMode": "Chunked"
+                                    }
+                                }
+                            },
+                            "Update_an_adaptive_card_in_a_chat_or_channel": {
+                                "runAfter": {
+                                    "Approve_Elevation_Request": [
+                                        "Succeeded"
+                                    ]
+                                },
+                                "type": "ApiConnection",
+                                "inputs": {
+                                    "host": {
+                                        "connection": {
+                                            "name": "@parameters('$connections')['teams']['connectionId']"
+                                        }
+                                    },
+                                    "method": "post",
+                                    "body": {
+                                        "messageId": "@variables('MessageId')",
+                                        "recipient": {
+                                            "groupId": "@parameters('teamsTeamId')",
+                                            "channelId": "@parameters('teamsChannelId')"
+                                        },
+                                        "messageBody": "@{variables('ApprovedCard')}"
+                                    },
+                                    "path": "/v1.0/teams/conversation/updateAdaptivecard/poster/Flow bot/location/@{encodeURIComponent('Channel')}"
+                                }
+                            }
+                        },
+                        "runAfter": {
+                            "Set_DeniedCard_Variable": [
+                                "Succeeded"
+                            ]
+                        },
+                        "else": {
+                            "actions": {
+                                "Deny_Elevation_Request": {
+                                    "type": "Http",
+                                    "inputs": {
+                                        "uri": "@{parameters('graphApiBaseUrl')}/deviceManagement/elevationRequests/@{body('Parse_Response_Data')?['requestId']}/deny",
+                                        "method": "POST",
+                                        "body": {
+                                            "reviewerJustification": "Denied via Teams by @{body('Post_adaptive_card_and_wait_for_a_response')?['responder']?['displayName']}"
+                                        },
+                                        "authentication": {
+                                            "type": "ManagedServiceIdentity",
+                                            "audience": "@parameters('graphApiAudience')",
+                                            "identity": "@parameters('managedIdentityResourceId')"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "Update_an_adaptive_card_in_a_chat_or_channel-copy": {
+                                    "runAfter": {
+                                        "Deny_Elevation_Request": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['teams']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "body": {
+                                            "messageId": "@variables('MessageId')",
+                                            "recipient": {
+                                                "groupId": "@parameters('teamsTeamId')",
+                                                "channelId": "@parameters('teamsChannelId')"
+                                            },
+                                            "messageBody": "@{variables('DeniedCard')}"
+                                        },
+                                        "path": "/v1.0/teams/conversation/updateAdaptivecard/poster/Flow bot/location/@{encodeURIComponent('Channel')}"
+                                    }
+                                }
+                            }
+                        },
+                        "expression": {
+                            "and": [
+                                {
+                                    "equals": [
+                                        "@body('Parse_Response_Data')?['action']",
+                                        "approve"
+                                    ]
+                                }
+                            ]
+                        },
+                        "type": "If"
+                    },
+                    "Set_ApprovedCard_Variable": {
+                        "runAfter": {
+                            "Parse_Response_Data": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "SetVariable",
+                        "inputs": {
+                            "name": "ApprovedCard",
+                            "value": {
+                                "type": "AdaptiveCard",
+                                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                                "version": "1.4",
+                                "body": [
+                                    {
+                                        "type": "Container",
+                                        "style": "good",
+                                        "items": [
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "✓ Request APPROVED",
+                                                "weight": "Bolder",
+                                                "size": "Large",
+                                                "color": "Good"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "FactSet",
+                                        "facts": [
+                                            {
+                                                "title": "Request ID:",
+                                                "value": "@{items('For_Each_Pending_Request')?['id']}"
+                                            },
+                                            {
+                                                "title": "Requester:",
+                                                "value": "@{items('For_Each_Pending_Request')?['requestedByUserPrincipalName']}"
+                                            },
+                                            {
+                                                "title": "Device Name:",
+                                                "value": "@{items('For_Each_Pending_Request')?['deviceName']}"
+                                            },
+                                            {
+                                                "title": "Application:",
+                                                "value": "@{items('For_Each_Pending_Request')?['applicationDetail']?['fileName']}"
+                                            },
+                                            {
+                                                "title": "File Path:",
+                                                "value": "@{items('For_Each_Pending_Request')?['applicationDetail']?['filePath']}"
+                                            },
+                                            {
+                                                "title": "Product:",
+                                                "value": "@{items('For_Each_Pending_Request')?['applicationDetail']?['productName']}"
+                                            },
+                                            {
+                                                "title": "Publisher:",
+                                                "value": "@{items('For_Each_Pending_Request')?['applicationDetail']?['publisherName']}"
+                                            },
+                                            {
+                                                "title": "Approved By:",
+                                                "value": "@{body('Post_adaptive_card_and_wait_for_a_response')?['responder']?['displayName']}"
+                                            },
+                                            {
+                                                "title": "Approved At:",
+                                                "value": "@{utcNow()}"
+                                            },
+                                            {
+                                                "title": "Expires At:",
+                                                "value": "@{addHours(utcNow(), 24)}"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "Container",
+                                        "style": "accent",
+                                        "items": [
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "Justification",
+                                                "weight": "Bolder",
+                                                "size": "Medium"
+                                            },
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "@{items('For_Each_Pending_Request')?['requestJustification']}",
+                                                "wrap": true
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "Container",
+                                        "style": "warning",
+                                        "items": [
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "⏱ Elevation Valid for 24 Hours",
+                                                "weight": "Bolder",
+                                                "color": "Warning"
+                                            },
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "This elevation will automatically expire 24 hours from approval time.",
+                                                "wrap": true,
+                                                "isSubtle": true,
+                                                "size": "Small"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "Set_DeniedCard_Variable": {
+                        "runAfter": {
+                            "Set_ApprovedCard_Variable": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "SetVariable",
+                        "inputs": {
+                            "name": "DeniedCard",
+                            "value": {
+                                "type": "AdaptiveCard",
+                                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                                "version": "1.4",
+                                "body": [
+                                    {
+                                        "type": "Container",
+                                        "style": "attention",
+                                        "items": [
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "✗ Request DENIED",
+                                                "weight": "Bolder",
+                                                "size": "Large",
+                                                "color": "Attention"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "FactSet",
+                                        "facts": [
+                                            {
+                                                "title": "Request ID:",
+                                                "value": "@{items('For_Each_Pending_Request')?['id']}"
+                                            },
+                                            {
+                                                "title": "Requester:",
+                                                "value": "@{items('For_Each_Pending_Request')?['requestedByUserPrincipalName']}"
+                                            },
+                                            {
+                                                "title": "Device Name:",
+                                                "value": "@{items('For_Each_Pending_Request')?['deviceName']}"
+                                            },
+                                            {
+                                                "title": "Application:",
+                                                "value": "@{items('For_Each_Pending_Request')?['applicationDetail']?['fileName']}"
+                                            },
+                                            {
+                                                "title": "File Path:",
+                                                "value": "@{items('For_Each_Pending_Request')?['applicationDetail']?['filePath']}"
+                                            },
+                                            {
+                                                "title": "Product:",
+                                                "value": "@{items('For_Each_Pending_Request')?['applicationDetail']?['productName']}"
+                                            },
+                                            {
+                                                "title": "Publisher:",
+                                                "value": "@{items('For_Each_Pending_Request')?['applicationDetail']?['publisherName']}"
+                                            },
+                                            {
+                                                "title": "Denied By:",
+                                                "value": "@{body('Post_adaptive_card_and_wait_for_a_response')?['responder']?['displayName']}"
+                                            },
+                                            {
+                                                "title": "Denied At:",
+                                                "value": "@{utcNow()}"
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "Container",
+                                        "style": "accent",
+                                        "items": [
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "Original Justification",
+                                                "weight": "Bolder",
+                                                "size": "Medium"
+                                            },
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "@{items('For_Each_Pending_Request')?['requestJustification']}",
+                                                "wrap": true
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "Container",
+                                        "style": "attention",
+                                        "items": [
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "❌ Access Denied",
+                                                "weight": "Bolder",
+                                                "color": "Attention"
+                                            },
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "The elevation request has been denied. The user will not receive elevated privileges for this application.",
+                                                "wrap": true,
+                                                "isSubtle": true,
+                                                "size": "Small"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                },
+                "runAfter": {
+                    "Initialize_DeniedCard_Variable": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Foreach"
+            },
+            "Initialize_Adaptive_Card_Variable": {
+                "runAfter": {
+                    "Filter_Pending_Requests": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "AdaptiveCard",
+                            "type": "Object"
+                        }
+                    ]
+                }
+            },
+            "Initialize_MessageId_Variable": {
+                "runAfter": {
+                    "Initialize_Adaptive_Card_Variable": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "MessageId",
+                            "type": "String"
+                        }
+                    ]
+                }
+            },
+            "Initialize_ApprovedCard_Variable": {
+                "runAfter": {
+                    "Initialize_MessageId_Variable": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "ApprovedCard",
+                            "type": "Object"
+                        }
+                    ]
+                }
+            },
+            "Initialize_DeniedCard_Variable": {
+                "runAfter": {
+                    "Initialize_ApprovedCard_Variable": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "DeniedCard",
+                            "type": "Object"
+                        }
+                    ]
+                }
+            }
+        },
+        "outputs": {},
+        "parameters": {
+            "graphApiBaseUrl": {
+                "defaultValue": "https://graph.microsoft.com/beta",
+                "type": "String"
+            },
+            "teamsTeamId": {
+                "type": "String"
+            },
+            "teamsChannelId": {
+                "type": "String"
+            },
+            "recurrenceIntervalMinutes": {
+                "defaultValue": 5,
+                "type": "Int"
+            },
+            "tenantId": {
+                "type": "String"
+            },
+            "graphApiAudience": {
+                "defaultValue": "https://graph.microsoft.com",
+                "type": "String"
+            },
+            "managedIdentityClientId": {
+                "type": "String"
+            },
+            "managedIdentityResourceId": {
+                "type": "String"
+            },
+            "$connections": {
+                "type": "Object",
+                "defaultValue": {}
+            }
+        }
+    },
+    "parameters": {
+        "graphApiBaseUrl": {
+            "type": "String"
+        },
+        "teamsTeamId": {
+            "type": "String"
+        },
+        "teamsChannelId": {
+            "type": "String"
+        },
+        "recurrenceIntervalMinutes": {
+            "type": "Int"
+        },
+        "tenantId": {
+            "type": "String"
+        },
+        "graphApiAudience": {
+            "type": "String"
+        },
+        "managedIdentityClientId": {
+            "type": "String"
+        },
+        "managedIdentityResourceId": {
+            "type": "String"
+        },
+        "$connections": {
+            "type": "Object"
+        }
+    }
+}

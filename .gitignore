@@ -1,0 +1,33 @@
+# Azure Bicep - Build artifacts
+*.bicep.json
+main.json
+*.json.bak
+
+# Azure CLI
+.azure/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# PowerShell
+*.ps1xml
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+~$*
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Sensitive data - DO NOT COMMIT
+*.secret.*
+secrets.json
