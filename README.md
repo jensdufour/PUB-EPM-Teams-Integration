@@ -4,6 +4,12 @@
 
 This solution automates **Endpoint Privilege Management (EPM) approval workflows** using Azure Logic Apps and Microsoft Teams. When elevation requests require approval in Microsoft Intune, an Adaptive Card is automatically posted to a Teams channel, allowing approvers to approve or deny requests directly from Teams.
 
+
+## Screenshots
+
+| ![Teams Channel with EPM Approval Card](img/requestapproved.png) | ![Adaptive Card with Approval Buttons](img/requestdenied.png) |
+
+
 ## Architecture
 
 ```
