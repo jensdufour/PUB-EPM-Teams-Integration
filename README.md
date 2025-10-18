@@ -136,50 +136,7 @@ The script will automatically:
 
 ### Step 4: Verify Deployment
 
-After deployment completes, verify everything is set up correctly:
-az login
-
-# Set subscription
-az account set --subscription "YOUR_SUBSCRIPTION_ID"
-
-# Create resource group
-az group create --name "rg-epm-approval" --location "eastus"
-
-# Deploy the template
-az deployment group create `
-  --resource-group "rg-epm-approval" `
-  --template-file "main.bicep" `
-  --parameters "main.bicepparam"
-```
-
-### Step 4: Assign Graph API Permissions to Managed Identity
-
-After deployment, assign the required Graph API permissions to the Managed Identity:
-
-```powershell
-# Get the output values
-$principalId = az deployment group show `
-  --resource-group "rg-epm-approval" `
-  --name "main" `
-  --query "properties.outputs.managedIdentityPrincipalId.value" `
-  --output tsv
-
-# Connect to Microsoft Graph
-Connect-MgGraph -Scopes "Application.ReadWrite.All", "AppRoleAssignment.ReadWrite.All"
-
-# Get Microsoft Graph Service Principal
-$graphSP = Get-MgServicePrincipal -Filter "displayName eq 'Microsoft Graph'"
-
-# Get the DeviceManagementConfiguration.ReadWrite.All permission
-$permission = $graphSP.AppRoles | Where-Object { $_.Value -eq "DeviceManagementConfiguration.ReadWrite.All" }
-
-# Assign the permission to the Managed Identity
-New-MgServicePrincipalAppRoleAssignment `
-  -ServicePrincipalId $principalId `
-  -PrincipalId $principalId `
-  -ResourceId $graphSP.Id `
-  -AppRoleId $permission.Id
-```
+After deployment completes, verify everything is set up correctly.
 
 ### Step 5: Authorize Teams Connection
 
