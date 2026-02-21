@@ -6,11 +6,11 @@
             "Recurrence": {
                 "recurrence": {
                     "frequency": "Minute",
-                    "interval": 5
+                    "interval": "@parameters('recurrenceIntervalMinutes')"
                 },
                 "evaluatedRecurrence": {
                     "frequency": "Minute",
-                    "interval": 5
+                    "interval": "@parameters('recurrenceIntervalMinutes')"
                 },
                 "type": "Recurrence"
             }
@@ -156,6 +156,18 @@
                     "where": "@equals(item()?['status'], 'pending')"
                 }
             },
+            "Filter_Recently_Changed_Requests": {
+                "runAfter": {
+                    "Parse_Elevation_Requests": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Query",
+                "inputs": {
+                    "from": "@body('Parse_Elevation_Requests')?['value']",
+                    "where": "@and(not(equals(item()?['status'], 'pending')), greater(item()?['requestLastModifiedDateTime'], subtractFromTime(utcNow(), parameters('recurrenceIntervalMinutes'), 'Minute')))"
+                }
+            },
             "For_Each_Pending_Request": {
                 "foreach": "@body('Filter_Pending_Requests')",
                 "actions": {
@@ -194,7 +206,7 @@
                                             },
                                             {
                                                 "title": "Device Name:",
-                                                "value": "@{items('For_Each_Pending_Request')?['requestedOnDeviceName']}"
+                                                "value": "@{items('For_Each_Pending_Request')?['deviceName']}"
                                             },
                                             {
                                                 "title": "Application:",
@@ -398,7 +410,7 @@
                                         }
                                     }
                                 },
-                                "Update_an_adaptive_card_in_a_chat_or_channel-copy": {
+                                "Update_Adaptive_Card_Denied": {
                                     "runAfter": {
                                         "Deny_Elevation_Request": [
                                             "Succeeded"
@@ -659,7 +671,7 @@
                     }
                 },
                 "runAfter": {
-                    "Initialize_DeniedCard_Variable": [
+                    "Initialize_StatusCard_Variable": [
                         "Succeeded"
                     ]
                 },
@@ -728,6 +740,131 @@
                         }
                     ]
                 }
+            },
+            "Initialize_StatusCard_Variable": {
+                "runAfter": {
+                    "Initialize_DeniedCard_Variable": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "InitializeVariable",
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "StatusCard",
+                            "type": "Object"
+                        }
+                    ]
+                }
+            },
+            "For_Each_Recently_Changed_Request": {
+                "foreach": "@body('Filter_Recently_Changed_Requests')",
+                "actions": {
+                    "Set_StatusCard_Variable": {
+                        "runAfter": {},
+                        "type": "SetVariable",
+                        "inputs": {
+                            "name": "StatusCard",
+                            "value": {
+                                "type": "AdaptiveCard",
+                                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                                "version": "1.4",
+                                "body": [
+                                    {
+                                        "type": "Container",
+                                        "style": "emphasis",
+                                        "items": [
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "Endpoint Privilege Management - Request Update",
+                                                "weight": "Bolder",
+                                                "size": "Large",
+                                                "color": "Accent"
+                                            },
+                                            {
+                                                "type": "TextBlock",
+                                                "text": "This request was resolved outside of Teams (via Intune)",
+                                                "weight": "Lighter",
+                                                "size": "Small",
+                                                "isSubtle": true
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "type": "FactSet",
+                                        "facts": [
+                                            {
+                                                "title": "Request ID:",
+                                                "value": "@{items('For_Each_Recently_Changed_Request')?['id']}"
+                                            },
+                                            {
+                                                "title": "Requester:",
+                                                "value": "@{items('For_Each_Recently_Changed_Request')?['requestedByUserPrincipalName']}"
+                                            },
+                                            {
+                                                "title": "Device Name:",
+                                                "value": "@{items('For_Each_Recently_Changed_Request')?['deviceName']}"
+                                            },
+                                            {
+                                                "title": "Application:",
+                                                "value": "@{items('For_Each_Recently_Changed_Request')?['applicationDetail']?['fileName']}"
+                                            },
+                                            {
+                                                "title": "Product:",
+                                                "value": "@{items('For_Each_Recently_Changed_Request')?['applicationDetail']?['productName']}"
+                                            },
+                                            {
+                                                "title": "Status:",
+                                                "value": "@{items('For_Each_Recently_Changed_Request')?['status']}"
+                                            },
+                                            {
+                                                "title": "Reviewed By:",
+                                                "value": "@{items('For_Each_Recently_Changed_Request')?['reviewCompletedByUserPrincipalName']}"
+                                            },
+                                            {
+                                                "title": "Last Updated:",
+                                                "value": "@{items('For_Each_Recently_Changed_Request')?['requestLastModifiedDateTime']}"
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "Post_Status_Update_Card": {
+                        "runAfter": {
+                            "Set_StatusCard_Variable": [
+                                "Succeeded"
+                            ]
+                        },
+                        "type": "ApiConnection",
+                        "inputs": {
+                            "host": {
+                                "connection": {
+                                    "name": "@parameters('$connections')['teams']['connectionId']"
+                                }
+                            },
+                            "method": "post",
+                            "body": {
+                                "recipient": {
+                                    "groupId": "@parameters('teamsTeamId')",
+                                    "channelId": "@parameters('teamsChannelId')"
+                                },
+                                "messageBody": "@{variables('StatusCard')}"
+                            },
+                            "path": "/v1.0/teams/conversation/adaptivecard/poster/Flow bot/location/@{encodeURIComponent('Channel')}"
+                        }
+                    }
+                },
+                "runAfter": {
+                    "Initialize_StatusCard_Variable": [
+                        "Succeeded"
+                    ],
+                    "Filter_Recently_Changed_Requests": [
+                        "Succeeded"
+                    ]
+                },
+                "type": "Foreach"
             }
         },
         "outputs": {},

@@ -173,7 +173,7 @@ output logicAppId string = logicApp.id
 @description('The name of the Logic App')
 output logicAppName string = logicApp.name
 
-@description('The resource ID of the the Managed Identity (use this to assign Graph API permissions)')
+@description('The resource ID of the Managed Identity (use this to assign Graph API permissions)')
 output managedIdentityId string = managedIdentity.id
 
 @description('The Principal ID of the Managed Identity (use this to assign Graph API permissions)')
