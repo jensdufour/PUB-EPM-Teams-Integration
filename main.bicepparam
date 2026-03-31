@@ -3,22 +3,22 @@ using './main.bicep'
 // ============================================================================
 // Required Parameters - UPDATE THESE VALUES BEFORE DEPLOYMENT
 // ============================================================================
-// ⚠️ IMPORTANT: Replace the example IDs below with your actual Teams IDs
+// IMPORTANT: Replace the example IDs below with your actual Teams IDs
 
 // Microsoft Teams Team ID where approval messages will be posted
 // To get this: Open Teams > Click "..." next to team name > Get link to team
 // Extract the groupId from the URL
-param teamsTeamId = ''  // ⚠️ REPLACE ME
+param teamsTeamId = ''  // REPLACE ME
 
 // Microsoft Teams Channel ID where approval messages will be posted
 // To get this: Open Teams > Right-click channel > Get link to channel
 // Extract the channel ID from the URL (after /channel/)
-param teamsChannelId = ''  // ⚠️ REPLACE ME
+param teamsChannelId = ''  // REPLACE ME
 
 // Azure AD Tenant ID for OAuth authentication
 // Leave empty to use the current deployment tenant
 // To get your Tenant ID: Azure Portal > Azure Active Directory > Overview
-param tenantId = '' // ⚠️ REPLACE ME
+param tenantId = '' // REPLACE ME
 
 // ============================================================================
 // Optional Parameters - Customize as needed
